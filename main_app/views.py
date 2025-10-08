@@ -1,5 +1,6 @@
 import json
 import csv
+import io
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.db import IntegrityError
@@ -16,6 +17,7 @@ def home_page(request):
     form = UnifiedUserForm()
 
     if request.method == 'POST' and request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        # --- Normal form submission ---
         form = UnifiedUserForm(request.POST)
         if form.is_valid():
             data = form.cleaned_data
@@ -179,3 +181,85 @@ def export_users_csv(request):
             user.Active,
         ])
     return response
+
+
+# --- Import users from CSV ---
+def import_users_csv(request):
+    if request.method == "POST" and request.FILES.get('csv_file'):
+        csv_file = request.FILES['csv_file']
+        if not csv_file.name.endswith('.csv'):
+            return JsonResponse({'success': False, 'message': 'File is not CSV type.'}, status=400)
+        try:
+            decoded_file = csv_file.read().decode('utf-8')
+            io_string = io.StringIO(decoded_file)
+            reader = csv.DictReader(io_string)
+            new_records = []
+
+            for row in reader:
+                # Create UserProfile
+                user_profile = UserProfile.objects.create(
+                    Name=row.get('Name', ''),
+                    Mobile=row.get('Mobile', ''),
+                    Email=row.get('Email', ''),
+                    Group=row.get('Group', ''),
+                    Status=row.get('Status', ''),
+                    Active=row.get('Active', 'True') == 'True',
+                    CreditLimit=row.get('Credit Limit') or None,
+                    PaymentTerms=row.get('Payment Terms', ''),
+                    Salesman=row.get('Salesman', ''),
+                    DefaultPriority=row.get('Priority') or 5,
+                    AlertNotes=row.get('Alert Notes', ''),
+                    QuickBooksClassName='',
+                    IssuableStatus='',
+                    Number=row.get('Account Number') or None
+                )
+
+                # Create Address
+                address_record = Address.objects.create(
+                    user=user_profile,
+                    AddressName=row.get('Address Name', ''),
+                    AddressContact=row.get('Address Contact', ''),
+                    AddressType=row.get('Address Type', ''),
+                    IsDefault=row.get('Is Default', 'False') == 'True',
+                    Address=row.get('Address', ''),
+                    City=row.get('City', ''),
+                    State=row.get('State', ''),
+                    Zip=row.get('Zip', ''),
+                    Country=row.get('Country', ''),
+                    Fax='',
+                    Pager='',
+                    Web=''
+                )
+
+                # Create ShippingAndTax
+                ShippingAndTax.objects.create(
+                    user=user_profile,
+                    TaxRate=row.get('Tax Rate') or None,
+                    TaxExempt=row.get('Tax Exempt', 'False') == 'True',
+                    TaxExemptNumber=row.get('Tax Exempt Number', ''),
+                    URL=row.get('URL', ''),
+                    CarrierName=row.get('Carrier', ''),
+                    CarrierService='',
+                    ShippingTerms=row.get('Shipping Terms', ''),
+                    ToBeEmailed=False,
+                    ToBePrinted=False,
+                )
+
+                new_records.append({
+                    'id': user_profile.pk,
+                    'LocationName': user_profile.Name,
+                    'Address': address_record.Address,
+                    'City': address_record.City,
+                    'State': address_record.State,
+                    'Zip': address_record.Zip,
+                    'ContactPerson': address_record.AddressContact,
+                    'Phone': user_profile.Mobile,
+                    'Email': user_profile.Email,
+                })
+
+            return JsonResponse({'success': True, 'message': f'{len(new_records)} users imported successfully.', 'new_records': new_records})
+
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': f'Error reading CSV: {str(e)}'}, status=500)
+
+    return JsonResponse({'success': False, 'message': 'Invalid request.'}, status=400)

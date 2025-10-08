@@ -46,7 +46,6 @@
                 {% csrf_token %}
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-
                     {% for field in unified_form %}
                         <div class="{% if field.name in 'Name,Address,AlertNotes' %}md:col-span-2{% else %}md:col-span-1{% endif %}">
                             <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">
@@ -58,7 +57,6 @@
                             {{ field }}
                         </div>
                     {% endfor %}
-
                 </div>
 
                 <div class="pt-5 border-t mt-8">
@@ -88,12 +86,11 @@
 
                     <input type="file" id="csvFile" accept=".csv" />
                     <button id="importCsvButton"
-                            onclick="document.getElementById('csvFile').click(); alert('TODO: Implement CSV Import logic.')"
                             class="inline-flex items-center px-4 py-2 border border-indigo-600 shadow-sm text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 transition duration-150">
                         <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                              xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round"
-                                                                  stroke-width="2"
-                                                                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                                                                          stroke-width="2"
+                                                                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
                         Import CSV
                     </button>
                     <button class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-gray-800 hover:bg-gray-900 transition duration-150"
@@ -130,6 +127,13 @@
                     <tbody id="dataTableBody" class="bg-white divide-y divide-gray-200">
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Pagination Controls -->
+            <div class="mt-4 flex justify-end space-x-2 items-center">
+                <button id="prevPage" class="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300">Prev</button>
+                <span id="pageInfo" class="px-2 py-1 font-medium"></span>
+                <button id="nextPage" class="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300">Next</button>
             </div>
         </section>
     </div>
@@ -220,16 +224,39 @@
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${record.Email}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button onclick="editRecord(${record.id})" class="text-indigo-600 hover:text-indigo-900 mr-3">Edit</button>
-                    <button onclick="deleteRecord(${record.id})" class="text-red-600 hover:text-red-900">Del</button>
                 </td>
             `;
             return row;
         }
 
+        let perPage = 5;
+        let currentPage = 1;
+        let paginatedData = [];
+
+        function displayPage(page = 1) {
+            const dataTableBody = document.getElementById('dataTableBody');
+            dataTableBody.innerHTML = '';
+            const totalPages = Math.ceil(paginatedData.length / perPage);
+            if (page < 1) page = 1;
+            if (page > totalPages) page = totalPages;
+            currentPage = page;
+
+            const start = (page - 1) * perPage;
+            const end = start + perPage;
+            paginatedData.slice(start, end).forEach(record => dataTableBody.appendChild(createTableRow(record)));
+
+            document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${totalPages}`;
+        }
+
+        function loadInitialData() {
+            const initialData = JSON.parse(document.getElementById('initial-data').textContent);
+            paginatedData = initialData;
+            displayPage(currentPage);
+        }
+
         window.submitDataAndAddToTable = async function() {
             const form = document.getElementById('unifiedForm');
             const formData = new FormData(form);
-            const dataTableBody = document.getElementById('dataTableBody');
 
             if (document.getElementById('id_Name')?.value.trim() === '') {
                 alert("Please enter a Location Name in the 'Name' field.");
@@ -253,8 +280,8 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    const newRow = createTableRow(result.new_record);
-                    dataTableBody.prepend(newRow);
+                    paginatedData.unshift(result.new_record); // add to beginning
+                    displayPage(1); // show first page
                     form.reset();
                     applyStylesAndPlaceholders();
                     document.getElementById('id_Name').focus();
@@ -277,34 +304,67 @@
             alert(`TODO: Implement Edit functionality for record ID: ${recordId}.`);
         };
 
-        window.deleteRecord = function(recordId) {
-            if (confirm(`Are you sure you want to delete record ID: ${recordId}?`)) {
-                fetch(`/delete-user/${recordId}/`, {
-                    method: "POST",
-                    headers: {"X-CSRFToken": '{{ csrf_token }}', "X-Requested-With": "XMLHttpRequest"}
-                })
-                .then(res => res.json())
-                .then(res => {
-                    if (res.success) {
-                        const row = document.getElementById(`row-${recordId}`);
-                        if (row) row.remove();
-                        alert(res.message);
-                    } else {
-                        alert(res.message);
-                    }
-                });
-            }
-        };
-
-        function loadInitialData() {
-            const dataTableBody = document.getElementById('dataTableBody');
-            const initialData = JSON.parse(document.getElementById('initial-data').textContent);
-            initialData.forEach(record => dataTableBody.appendChild(createTableRow(record)));
-        }
-
         document.addEventListener('DOMContentLoaded', () => {
             applyStylesAndPlaceholders();
             loadInitialData();
+
+            document.getElementById('prevPage').addEventListener('click', () => {
+                if (currentPage > 1) displayPage(currentPage - 1);
+            });
+
+            document.getElementById('nextPage').addEventListener('click', () => {
+                const totalPages = Math.ceil(paginatedData.length / perPage);
+                if (currentPage < totalPages) displayPage(currentPage + 1);
+            });
+        });
+
+    </script>
+
+    <script>
+        const csvFileInput = document.getElementById('csvFile');
+        const importCsvButton = document.getElementById('importCsvButton');
+
+        importCsvButton.addEventListener('click', () => {
+            csvFileInput.click();
+        });
+
+        csvFileInput.addEventListener('change', async () => {
+            if (!csvFileInput.files.length) return;
+
+            const file = csvFileInput.files[0];
+            const formData = new FormData();
+            formData.append('csv_file', file);
+
+            importCsvButton.disabled = true;
+            importCsvButton.textContent = 'Importing...';
+
+            try {
+                const response = await fetch("{% url 'import_csv' %}", {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': document.querySelector('[name="csrfmiddlewaretoken"]').value
+                    },
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    paginatedData = result.new_records.concat(paginatedData);
+                    displayPage(1);
+                    alert(result.message);
+                } else {
+                    alert('CSV Import Error: ' + result.message);
+                }
+            } catch (error) {
+                console.error(error);
+                alert('Critical error during CSV import. Check console.');
+            } finally {
+                importCsvButton.disabled = false;
+                importCsvButton.textContent = 'Import CSV';
+                csvFileInput.value = '';
+            }
         });
     </script>
 </body>
