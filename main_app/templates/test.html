@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Customer Data Entry System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        label:after { content: none !important; }
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%236B7280'%3E%3Cpath d='M7 7l3-3 3 3m0 6l-3 3-3-3' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.5rem center;
+            background-size: 1.5em;
+            padding-right: 2.5rem;
+        }
+        #csvFile { display: none; }
+
+        /* --- Modal center and animation --- */
+        #addRowModal {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        #addRowModal.active {
+            display: flex;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen p-4 sm:p-8 font-sans">
+    <div class="max-w-6xl mx-auto bg-white shadow-2xl rounded-xl p-6 sm:p-10 border border-gray-200 space-y-10">
+        <header class="flex justify-between items-start border-b pb-1 mb-6">
+            <div class="flex flex-col">
+                <h1 class="text-2xl font-extrabold text-gray-900 mb-1">Customer Data Entry System</h1>
+                <p class="text-gray-500 text-sm">
+                    Enter parent company information and child shipping locations. Export data to multiple systems including Fishbowl, WooCommerce, Zoho CRM, or as CSV.
+                </p>
+            </div>
+        </header>
+
+        <!-- Dynamic Form Section -->
+        <section>
+            <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Parent Company / Billing Information</h2>
+            <form id="unifiedForm" action="." onsubmit="event.preventDefault(); submitDataAndAddToTable();" class="space-y-4">
+                {% csrf_token %}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                    {% for field in unified_form %}
+                        <div class="{% if field.name in 'Name,Address,AlertNotes' %}md:col-span-2{% else %}md:col-span-1{% endif %}">
+                            <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                {{ field.label }}
+                                {% if field.field.required and field.name not in "IsDefault,Residential,TaxExempt,Active,ToBeEmailed,ToBePrinted" %}
+                                    <span class="text-red-500">*</span>
+                                {% endif %}
+                            </label>
+                            {{ field }}
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <div class="pt-5 border-t mt-8">
+                    <button type="submit" class="w-full inline-flex justify-center py-3 px-6 border border-transparent shadow-lg text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
+                        Submit Data & Save to Database
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Child Accounts / Table Section -->
+        <section>
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800 border-b pb-2 sm:border-none sm:pb-0 mb-3 sm:mb-0">
+                    Child Accounts / Shipping Locations
+                </h2>
+                <div class="flex flex-wrap space-x-3">
+                    <a href="{% url 'export_csv' %}" id="exportCsvLink" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition duration-150">
+                        Export CSV
+                    </a>
+
+                    <input type="file" id="csvFile" accept=".csv" />
+                    <button id="importCsvButton" class="inline-flex items-center px-4 py-2 border border-indigo-600 shadow-sm text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 transition duration-150">
+                        Import CSV
+                    </button>
+
+                    <button id="addRowBtn" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-gray-800 hover:bg-gray-900 transition duration-150">
+                        Add Row
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-gray-50 rounded-lg border border-gray-200 overflow-x-auto shadow-inner">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-100">
+                        <tr id="tableHeaderRow"></tr>
+                    </thead>
+                    <tbody id="dataTableBody" class="bg-white divide-y divide-gray-200"></tbody>
+                </table>
+            </div>
+
+            <!-- Pagination Controls -->
+            <div class="mt-4 flex justify-end space-x-2 items-center">
+                <button id="prevPage" class="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300">Prev</button>
+                <span id="pageInfo" class="px-2 py-1 font-medium"></span>
+                <button id="nextPage" class="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300">Next</button>
+            </div>
+        </section>
+    </div>
+
+    <!-- Field Selection Modal -->
+    <div id="addRowModal" class="fixed inset-0 bg-black bg-opacity-50 hidden justify-center items-center z-50">
+        <div class="bg-white rounded-xl p-8 w-11/12 md:w-2/3 lg:w-1/2 max-h-[85vh] overflow-y-auto shadow-2xl">
+            <h3 class="text-2xl font-bold mb-6 text-gray-800 text-center">Select Fields to Display in Table</h3>
+            <form id="fieldSelectionForm" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {% for field in unified_form %}
+                <label class="flex items-center space-x-3 bg-gray-50 border border-gray-200 rounded-lg p-2 hover:bg-gray-100 transition">
+                    <input type="checkbox" class="field-checkbox accent-indigo-600"
+                        data-field="{{ field.label }}"
+                        {% if field.label in "Location Name,Address,City,State,ZIP Code,Contact Person,Phone,Email" %}checked{% endif %}>
+                    <span class="text-gray-800 text-sm">{{ field.label }}</span>
+                </label>
+                {% endfor %}
+            </form>
+            <div class="mt-6 flex justify-end space-x-4">
+                <button id="cancelFieldSelection" class="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
+                <button id="saveFieldSelection" class="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script id="initial-data" type="application/json">
+        {{ initial_table_data_json|safe }}
+    </script>
+
+    <script>
+        const COMMON_CLASSES = ['mt-1','block','w-full','rounded-lg','border','border-gray-400','shadow-md','focus:border-indigo-500','focus:ring-indigo-500','p-2.5','transition','duration-150','ease-in-out','hover:border-indigo-300'];
+
+        function applyStylesAndPlaceholders(){
+            document.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]), textarea, select')
+                .forEach(el=>el.classList.add(...COMMON_CLASSES));
+        }
+
+        let perPage = 5, currentPage = 1, paginatedData = [];
+        let selectedFields = {};
+
+        const defaultFields = ["Location Name","Address","City","State","ZIP Code","Contact Person","Phone","Email"];
+        defaultFields.forEach(f => selectedFields[f] = true);
+
+        function createTableRow(record){
+            const row=document.createElement('tr'); row.classList.add('hover:bg-indigo-50','transition','duration-100');
+            for(const field in selectedFields){
+                if(selectedFields[field]){
+                    const key = field.replace(/\s+/g,'');
+                    row.innerHTML += `<td class="px-6 py-4 text-sm text-gray-700">${record[key] || ''}</td>`;
+                }
+            }
+            row.innerHTML += `<td class="px-6 py-4 text-right text-sm font-medium"><button class="text-indigo-600 hover:text-indigo-900">Edit</button></td>`;
+            return row;
+        }
+
+        function renderTable(){
+            const thead=document.getElementById('tableHeaderRow');
+            const tbody=document.getElementById('dataTableBody');
+            thead.innerHTML=''; tbody.innerHTML='';
+            for(const field in selectedFields){ if(selectedFields[field]) thead.innerHTML += `<th class="px-6 py-3 text-xs text-gray-600 uppercase">${field}</th>`;}
+            thead.innerHTML += `<th class="px-6 py-3 text-xs text-gray-600 uppercase">Actions</th>`;
+            const start=(currentPage-1)*perPage, end=start+perPage;
+            paginatedData.slice(start,end).forEach(r=>tbody.appendChild(createTableRow(r)));
+            document.getElementById('pageInfo').textContent = `Page ${currentPage} of ${Math.ceil(paginatedData.length/perPage)||1}`;
+        }
+
+        function loadInitialData(){
+            paginatedData = JSON.parse(document.getElementById('initial-data').textContent || '[]');
+            renderTable();
+        }
+
+        // Pagination buttons
+        document.addEventListener('DOMContentLoaded',()=>{
+            applyStylesAndPlaceholders(); loadInitialData();
+            document.getElementById('prevPage').addEventListener('click',()=>{if(currentPage>1){currentPage--;renderTable();}});
+            document.getElementById('nextPage').addEventListener('click',()=>{if(currentPage<Math.ceil(paginatedData.length/perPage)){currentPage++;renderTable();}});
+        });
+
+        // Modal logic
+        const modal=document.getElementById('addRowModal');
+        document.getElementById('addRowBtn').addEventListener('click',()=>{
+            modal.classList.add('active');
+            document.querySelectorAll('.field-checkbox').forEach(cb=>{
+                cb.checked = selectedFields[cb.dataset.field] || false;
+            });
+        });
+        document.getElementById('cancelFieldSelection').addEventListener('click',()=>modal.classList.remove('active'));
+        document.getElementById('saveFieldSelection').addEventListener('click',()=>{
+            document.querySelectorAll('.field-checkbox').forEach(cb=>selectedFields[cb.dataset.field]=cb.checked);
+            modal.classList.remove('active');
+            renderTable();
+        });
+    </script>
+</body>
+</html>
