@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Customer Data Entry System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for consistency and select appearance */
+        label:after {
+            content: none !important;
+        }
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%236B7280'%3E%3Cpath d='M7 7l3-3 3 3m0 6l-3 3-3-3' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.5rem center;
+            background-size: 1.5em;
+            padding-right: 2.5rem;
+        }
+        #csvFile {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen p-4 sm:p-8 font-sans">
+    <div class="max-w-6xl mx-auto bg-white shadow-2xl rounded-xl p-6 sm:p-10 border border-gray-200 space-y-10">
+        <header class="flex justify-between items-start border-b pb-1 mb-6">
+            <div class="flex flex-col">
+                <h1 class="text-2xl font-extrabold text-gray-900 mb-1">Customer Data Entry System</h1>
+                <p class="text-gray-500 text-sm">
+                    Enter parent company information and child shipping locations. Export data to multiple systems including Fishbowl, WooCommerce, Zoho CRM, or as CSV.
+                </p>
+            </div>
+        </header>
+
+        <!-- Dynamic Form Section -->
+        <section>
+            <h2 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Parent Company / Billing Information</h2>
+
+            <form id="unifiedForm"
+                  action="."
+                  onsubmit="event.preventDefault(); submitDataAndAddToTable();"
+                  class="space-y-4">
+
+                {% csrf_token %}
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+
+                    {% for field in unified_form %}
+                        <div class="{% if field.name in 'Name,Address,AlertNotes' %}md:col-span-2{% else %}md:col-span-1{% endif %}">
+                            <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">
+                                {{ field.label }}
+                                {% if field.field.required and field.name not in "IsDefault,Residential,TaxExempt,Active,ToBeEmailed,ToBePrinted" %}
+                                    <span class="text-red-500">*</span>
+                                {% endif %}
+                            </label>
+                            {{ field }}
+                        </div>
+                    {% endfor %}
+
+                </div>
+
+                <div class="pt-5 border-t mt-8">
+                    <button type="submit"
+                            class="w-full inline-flex justify-center py-3 px-6 border border-transparent shadow-lg text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
+                        Submit Data & Save to Database
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Child Accounts / Table Section -->
+        <section>
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800 border-b pb-2 sm:border-none sm:pb-0 mb-3 sm:mb-0">
+                    Child Accounts / Shipping Locations
+                </h2>
+                <div class="flex flex-wrap space-x-3">
+                    <a href="{% url 'export_csv' %}" id="exportCsvLink"
+                       class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition duration-150">
+                        <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                             xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round"
+                                                                  stroke-width="2"
+                                                                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H5a2 2 0 01-2-2v-5a2 2 0 012-2h14a2 2 0 012 2v5a2 2 0 01-2 2z"></path></svg>
+                        Export CSV
+                    </a>
+
+                    <input type="file" id="csvFile" accept=".csv" />
+                    <button id="importCsvButton"
+                            onclick="document.getElementById('csvFile').click(); alert('TODO: Implement CSV Import logic.')"
+                            class="inline-flex items-center px-4 py-2 border border-indigo-600 shadow-sm text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 transition duration-150">
+                        <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                             xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round"
+                                                                  stroke-width="2"
+                                                                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        Import CSV
+                    </button>
+                    <button class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-lg text-white bg-gray-800 hover:bg-gray-900 transition duration-150"
+                            onclick="alert('TODO: Implement Add Row functionality.')">
+                        <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                             xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round"
+                                                                  stroke-width="2"
+                                                                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                        Add Row
+                    </button>
+                </div>
+            </div>
+
+            <p class="text-sm text-gray-500 mb-4">
+                Data is pulled live from the shared database. (Child locations for this app:
+                <span id="appIdDisplay" class="font-mono text-xs">**MOCKUP-ID**</span>)
+            </p>
+
+            <div class="bg-gray-50 rounded-lg border border-gray-200 overflow-x-auto shadow-inner">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Location Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Address</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">City</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px]">State</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[80px]">ZIP Code</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px]">Contact Person</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">Phone</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">Email</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[100px]">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dataTableBody" class="bg-white divide-y divide-gray-200">
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <!-- Initial data -->
+    <script id="initial-data" type="application/json">
+        {{ initial_table_data_json|safe }}
+    </script>
+
+    <!-- JS logic -->
+    <script>
+        const COMMON_CLASSES = [
+            'mt-1', 'block', 'w-full', 'rounded-lg', 'border', 'border-gray-400',
+            'shadow-md', 'focus:border-indigo-500', 'focus:ring-indigo-500',
+            'p-2.5', 'transition', 'duration-150', 'ease-in-out', 'hover:border-indigo-300'
+        ];
+
+        const PLACEHOLDERS = {
+            'id_Name': 'Enter company name',
+            'id_AddressName': 'Address label, e.g. Main Address',
+            'id_AddressContact': 'Contact person at address',
+            'id_AddressType': 'RES, MAIN, HOME, WORK, OTHER',
+            'id_IsDefault': '',
+            'id_Address': 'Street address',
+            'id_City': 'City',
+            'id_State': 'State / Province',
+            'id_Zip': 'ZIP / Postal Code',
+            'id_Country': 'Country',
+            'id_Residential': '',
+            'id_Main': 'Main phone',
+            'id_Home': 'Home phone',
+            'id_Work': 'Work phone',
+            'id_Mobile': 'Mobile number',
+            'id_Fax': 'Fax number',
+            'id_Email': 'Email address',
+            'id_Pager': 'Pager / alternative contact',
+            'id_Web': 'Website URL',
+            'id_Other': 'Other contact / note',
+            'id_Group': 'Group / category',
+            'id_CreditLimit': 'Credit limit',
+            'id_Status': 'Status (Active / Inactive / etc.)',
+            'id_Active': '',
+            'id_TaxRate': 'Tax rate e.g. 0.05',
+            'id_Salesman': 'Salesman name / ID',
+            'id_DefaultPriority': 'Default priority (e.g. 1‑10)',
+            'id_Number': 'Account / Number field',
+            'id_PaymentTerms': 'Payment Terms, e.g. NET 30',
+            'id_TaxExempt': '',
+            'id_TaxExemptNumber': 'Exempt number / tax ID',
+            'id_URL': 'Website / portal URL',
+            'id_CarrierName': 'Carrier name',
+            'id_CarrierService': 'Carrier service name',
+            'id_ShippingTerms': 'Shipping terms',
+            'id_AlertNotes': 'Any special notes / alerts',
+            'id_QuickBooksClassName': 'QuickBooks Class name',
+            'id_ToBeEmailed': '',
+            'id_ToBePrinted': '',
+            'id_IssuableStatus': 'Issuable status etc.'
+        };
+
+        function applyStylesAndPlaceholders() {
+            const elems = document.querySelectorAll(
+                'input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="file"]), textarea, select'
+            );
+            elems.forEach(el => el.classList.add(...COMMON_CLASSES));
+
+            document.querySelectorAll('input[type="checkbox"], input[type="radio"]')
+                .forEach(el => el.classList.add('h-4', 'w-4', 'text-indigo-600', 'border-gray-300', 'rounded', 'focus:ring-indigo-500'));
+
+            Object.entries(PLACEHOLDERS).forEach(([id, text]) => {
+                const element = document.getElementById(id);
+                if (element) element.setAttribute('placeholder', text);
+            });
+        }
+
+        function createTableRow(record) {
+            const row = document.createElement('tr');
+            row.classList.add('hover:bg-indigo-50', 'transition', 'duration-100');
+            row.id = `row-${record.id}`;
+            row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${record.LocationName}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${record.Address}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${record.City}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${record.State}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${record.Zip}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${record.ContactPerson}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${record.Phone}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${record.Email}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button onclick="editRecord(${record.id})" class="text-indigo-600 hover:text-indigo-900 mr-3">Edit</button>
+                    <button onclick="deleteRecord(${record.id})" class="text-red-600 hover:text-red-900">Del</button>
+                </td>
+            `;
+            return row;
+        }
+
+        window.submitDataAndAddToTable = async function() {
+            const form = document.getElementById('unifiedForm');
+            const formData = new FormData(form);
+            const dataTableBody = document.getElementById('dataTableBody');
+
+            if (document.getElementById('id_Name')?.value.trim() === '') {
+                alert("Please enter a Location Name in the 'Name' field.");
+                return;
+            }
+
+            const submitButton = form.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.textContent = 'Saving...';
+
+            try {
+                const response = await fetch(".", {
+                    method: "POST",
+                    headers: {
+                        "X-Requested-With": "XMLHttpRequest",
+                        "X-CSRFToken": form.querySelector('[name="csrfmiddlewaretoken"]').value
+                    },
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    const newRow = createTableRow(result.new_record);
+                    dataTableBody.prepend(newRow);
+                    form.reset();
+                    applyStylesAndPlaceholders();
+                    document.getElementById('id_Name').focus();
+                    alert(result.message);
+                } else {
+                    const errors = result.errors ? JSON.stringify(result.errors) : result.message;
+                    alert("Error saving data: " + errors);
+                }
+
+            } catch (error) {
+                console.error(error);
+                alert("A critical error occurred. Check console for details.");
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Submit Data & Save to Database';
+            }
+        };
+
+        window.editRecord = function(recordId) {
+            alert(`TODO: Implement Edit functionality for record ID: ${recordId}.`);
+        };
+
+        window.deleteRecord = function(recordId) {
+            if (confirm(`Are you sure you want to delete record ID: ${recordId}?`)) {
+                fetch(`/delete-user/${recordId}/`, {
+                    method: "POST",
+                    headers: {"X-CSRFToken": '{{ csrf_token }}', "X-Requested-With": "XMLHttpRequest"}
+                })
+                .then(res => res.json())
+                .then(res => {
+                    if (res.success) {
+                        const row = document.getElementById(`row-${recordId}`);
+                        if (row) row.remove();
+                        alert(res.message);
+                    } else {
+                        alert(res.message);
+                    }
+                });
+            }
+        };
+
+        function loadInitialData() {
+            const dataTableBody = document.getElementById('dataTableBody');
+            const initialData = JSON.parse(document.getElementById('initial-data').textContent);
+            initialData.forEach(record => dataTableBody.appendChild(createTableRow(record)));
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            applyStylesAndPlaceholders();
+            loadInitialData();
+        });
+    </script>
+
+</body>
+</html>

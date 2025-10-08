@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>All Saved User Data</title>
+</head>
+<body>
+    <h1>All Saved User Records</h1>
+
+    <p><a href="{% url 'home' %}">← Go back to the form submission page</a></p>
+
+    {% if all_users_data %}
+    <table border="1" cellpadding="10" style="width: 100%;">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Mobile</th>
+                <th>Address Name</th>
+                <th>Address Details</th>
+                <th>City, State, Zip</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in all_users_data %}
+            <tr>
+                <td>{{ user.Name }}</td>
+                <td>{{ user.Email }}</td>
+                <td>{{ user.Mobile }}</td>
+
+                {% with primary_address=user.addresses.first %}
+                    {% if primary_address %}
+                        <td>{{ primary_address.AddressName }}</td>
+                        <td>{{ primary_address.Address }}</td>
+                        <td>{{ primary_address.City }}, {{ primary_address.State }}, {{ primary_address.Zip }}</td>
+                    {% else %}
+                        <td colspan="3">No Address Found</td>
+                    {% endif %}
+                {% endwith %}
+
+                <td>{{ user.Status }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No user records have been submitted yet.</p>
+    {% endif %}
+
+</body>
+</html>
